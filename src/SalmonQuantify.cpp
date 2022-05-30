@@ -2832,23 +2832,29 @@ std::vector<std::string> getStrandedness(
   std::vector<std::string> mates2_paths,
   std::vector<std::string> unmated_paths
 ) {
+  namespace bfs = boost::filesystem;
+  bfs::path logPath = indexDirectory / "pre_indexing.log"; 
+  auto fileSink = std::make_shared<spdlog::sinks::simple_file_sink_mt>(
+        logPath.string(), true);
+  auto consoleSink = std::make_shared<spdlog::sinks::stderr_sink_mt>();
+  auto fileLog = spdlog::create("fLog", {fileSink});
+  auto jointLog = spdlog::create("jLog", {fileSink, consoleSink});
+
   std::vector<ReadLibrary> readLibraries
     = extractReadLibrariesForStrandedness(mates1_paths, mates2_paths, unmated_paths);
-  
   SalmonOpts sopt;
+  sopt.jointLog = jointLog;
   std::unique_ptr<SalmonIndex> salmonIndex = checkLoadIndex(indexDirectory, sopt.jointLog);
   MappingStatistics mstats;
   ReadExperimentT experiment(readLibraries, salmonIndex.get(), sopt);
   experiment.equivalenceClassBuilder().setMaxResizeThreads( sopt.maxHashResizeThreads);
   experiment.equivalenceClassBuilder().start();
-
   sopt.numThreads = std::thread::hardware_concurrency();
   quantifyLibrary<QuasiAlignment>(experiment, sopt, mstats, sopt.numThreads);
     
-    
   std::vector<std::string> fmtStrs ;
   for (int i = 0; i < readLibraries.size(); i++) {
-      fmtStrs[i] = readLibraries[i].getFormat().toString();
+      fmtStrs.push_back(readLibraries[i].getFormat().toString());
   }
   return fmtStrs;
 

@@ -156,134 +156,27 @@ int salmonBarcoding(int argc, const char* argv[], std::unique_ptr<SalmonIndex>& 
 int salmonQuantMerge(int argc, const char* argv[],
                      std::unique_ptr<SalmonIndex>& index);
 
+std::vector<std::string> getStrandedness(
+  const boost::filesystem::path& indexDirectory,
+  std::vector<std::string> mates1_paths,
+  std::vector<std::string> mates2_paths,
+  std::vector<std::string> unmated_paths
+);
+
+
 bool verbose = false;
 
 int main(int argc, const char* argv[]) {
-  using std::string;
-  namespace po = boost::program_options;
-  std::setlocale(LC_ALL, "en_US.UTF-8");
-
-  // With no arguments, print help
-  if (argc == 1) {
-    std::vector<std::string> o;
-    help(o); // argc, argv);
-    std::exit(1);
-  }
-
-  try {
-
-    // subcommand parsing code inspired by :
-    // https://gist.github.com/randomphrase/10801888
-    po::options_description sfopts("Allowed Options");
-    sfopts.add_options()("version,v", "print version string")(
-        "no-version-check",
-        "don't check with the server to see if this is the latest version")(
-        "cite,c", "show citation information")(
-        "help,h", "produce help message")("command", po::value<string>(),
-                                          "command to run {index, quant, sf}")(
-        "subargs", po::value<std::vector<std::string>>(),
-        "Arguments for command");
-
-    po::options_description all("Allowed Options");
-    all.add(sfopts);
-
-    po::positional_options_description pd;
-    pd.add("command", 1).add("subargs", -1);
-
-    po::variables_map vm;
-    po::parsed_options parsed = po::command_line_parser(argc, argv)
-                                    .options(all)
-                                    .positional(pd)
-                                    .allow_unregistered()
-                                    .run();
-    po::store(parsed, vm);
-
-    if (vm.count("version")) {
-      std::cout << "salmon " << salmon::version << "\n";
-      std::exit(0);
-    }
-
-    if (vm.count("help") and !vm.count("command")) {
-      std::vector<std::string> o;
-      help(o);
-      std::exit(0);
-    }
-
-    if (vm.count("cite") and !vm.count("command")) {
-      printCite();
-      std::exit(0);
-    }
-
-    const char* no_version_env_ptr = std::getenv("SALMON_NO_VERSION_CHECK");
-    std::string no_version_env = (no_version_env_ptr == nullptr) ? "" : std::string(no_version_env_ptr);
-    std::transform(no_version_env.begin(), no_version_env.end(), no_version_env.begin(), 
-                   [](unsigned char c){ return std::toupper(c); } // correct
-                  );
-    bool skip_version_check = vm.count("no-version-check") or (no_version_env == "1") 
-                              or (no_version_env == "TRUE") or (no_version_env == "T");
-
-    if (!skip_version_check) {
-      std::string versionMessage = getVersionMessage();
-      std::cerr << versionMessage;
-    }
-
-    // po::notify(vm);
-
-    std::string cmd = vm["command"].as<std::string>();
-    std::vector<std::string> opts =
-        po::collect_unrecognized(parsed.options, po::include_positional);
-    opts.erase(opts.begin());
-    // if there was a help and a command, then add the help back since it was
-    // parsed
-    if (vm.count("help")) {
-      opts.insert(opts.begin(), "--help");
-    }
-
-    std::unordered_map<string, SubCmdType> cmds(
-        {{"index", salmonIndex},
-         {"quant", salmonAlignmentDualMode},
-         {"quantmerge", salmonQuantMerge},
-         // TODO : PF_INTEGRATION
-         {"alevin", salmonBarcoding},
-         {"swim", salmonSwim}});
-
-    /*
-    //string cmd = vm["command"].as<string>();
-    int subCommandArgc = argc - topLevelArgc + 1;
-    char** argv2 = new char*[subCommandArgc];
-    argv2[0] = argv[0];
-    std::copy_n( &argv[topLevelArgc], argc-topLevelArgc, &argv2[1] );
-    */
-
-    std::unique_ptr<SalmonIndex> preloadedIndex;
-
-    int32_t nargc = opts.size() + 1;
-    std::unique_ptr<const char* []> argv2(new const char*[nargc]);
-    argv2[0] = argv[0];
-    for (int32_t i = 0; i < nargc - 1; ++i) {
-      argv2[i + 1] = opts[i].c_str();
-    }
-    const char** nargv = argv2.get();
-
-    while(true) {
-      auto cmdMain = cmds.find(cmd);
-      if (cmdMain == cmds.end()) {
-        // help(subCommandArgc, argv2);
-        return help(opts);
-      }
-      return cmdMain->second(nargc, nargv, preloadedIndex);
-    }
-  } catch (po::error& e) {
-    std::cerr << "Program Option Error (main) : [" << e.what()
-              << "].\n Exiting.\n";
-    std::exit(1);
-  } catch (...) {
-    std::cerr << argv[0] << " was invoked improperly.\n";
-    std::cerr << "For usage information, try " << argv[0]
-              << " --help\nExiting.\n";
-  }
-
-  return 0;
+	std::vector<std::string> paths_1;
+	std::vector<std::string> paths_2;
+	paths_1.push_back("/home/admin/salmon/sample_data/reads_1.fastq");
+	paths_2.push_back("/home/admin/salmon/sample_data/reads_2.fastq");
+	std::string index_path = "/home/admin/salmon_index";
+	std::vector<std::string> unstranded_paths;
+	// std::cout <<
+	for(auto libtype :   getStrandedness(index_path, paths_1, paths_2, unstranded_paths))
+		std::cout << "LibType: " << libtype  << "\n";
+	return 0;
 }
 
 int salmonAlignmentDualMode(int argc, const char* argv[], std::unique_ptr<SalmonIndex>& index) {
