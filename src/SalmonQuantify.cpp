@@ -51,6 +51,7 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/range/join.hpp>
 #include <boost/lockfree/queue.hpp>
 #include <boost/program_options.hpp>
 #include <boost/range/irange.hpp>
@@ -2771,4 +2772,84 @@ transcript abundance from RNA-seq reads
   }
 
   return 0;
+}
+
+std::vector<ReadLibrary> extractReadLibrariesForStrandedness(
+  const std::vector<std::string>& mates1,
+  const std::vector<std::string>& mates2,
+  const std::vector<std::string>& unmatedReads) {
+  // libtype: A
+
+
+  LibraryFormat seFormat(ReadType::SINGLE_END, ReadOrientation::NONE,
+                           ReadStrandedness::U);
+  LibraryFormat peFormat(ReadType::PAIRED_END, ReadOrientation::TOWARD,
+                            ReadStrandedness::U);
+
+  // vector because user can supply multiple files at once
+  std::vector<ReadLibrary> peLibs{peFormat};
+  std::vector<ReadLibrary> seLibs{seFormat};
+
+  peLibs.back().addMates1(mates1);
+  peLibs.back().enableAutodetect();
+
+  peLibs.back().addMates2(mates2);
+  peLibs.back().enableAutodetect();
+
+  seLibs.back().addUnmated(unmatedReads);
+  seLibs.back().enableAutodetect();
+
+  std::vector<ReadLibrary> libs;
+  
+  libs.reserve(peLibs.size() + seLibs.size());
+  for (auto& lib : boost::range::join(seLibs, peLibs)) {
+    if (lib.format().type == ReadType::SINGLE_END) {
+      if (lib.unmated().size() == 0) {
+        // Didn't use default single end library type
+        continue;
+      }
+    } else if (lib.format().type == ReadType::PAIRED_END) {
+      if (lib.mates1().size() == 0 or lib.mates2().size() == 0) {
+        // Didn't use default paired-end library type
+        continue;
+      }
+    }
+    libs.push_back(lib);
+  }
+  size_t numLibs = libs.size();
+//if (numLibs == 1) {
+//    log->info("There is 1 library.");
+//  } else if (numLibs > 1) {
+//    log->info("There are {} libraries.", numLibs);
+//  }
+  return libs;
+}
+
+
+std::vector<std::string> getStrandedness(
+  const boost::filesystem::path& indexDirectory,
+  std::vector<std::string> mates1_paths,
+  std::vector<std::string> mates2_paths,
+  std::vector<std::string> unmated_paths
+) {
+  std::vector<ReadLibrary> readLibraries
+    = extractReadLibrariesForStrandedness(mates1_paths, mates2_paths, unmated_paths);
+  
+  SalmonOpts sopt;
+  std::unique_ptr<SalmonIndex> salmonIndex = checkLoadIndex(indexDirectory, sopt.jointLog);
+  MappingStatistics mstats;
+  ReadExperimentT experiment(readLibraries, salmonIndex.get(), sopt);
+  experiment.equivalenceClassBuilder().setMaxResizeThreads( sopt.maxHashResizeThreads);
+  experiment.equivalenceClassBuilder().start();
+
+  sopt.numThreads = std::thread::hardware_concurrency();
+  quantifyLibrary<QuasiAlignment>(experiment, sopt, mstats, sopt.numThreads);
+    
+    
+  std::vector<std::string> fmtStrs ;
+  for (int i = 0; i < readLibraries.size(); i++) {
+      fmtStrs[i] = readLibraries[i].getFormat().toString();
+  }
+  return fmtStrs;
+
 }
