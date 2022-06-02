@@ -32,7 +32,7 @@ if(NOT DEFINED USE_ARM)
   endif()
 endif()
 
-option(USE_SHARED_LIBS "Use shared instead of static libraries" OFF)
+option(USE_SHARED_LIBS "Use shared instead of static libraries" ON)
 
 # auto-populate version:
 # from https://stackoverflow.com/questions/47066115/cmake-get-version-from-multi-line-text-file
@@ -86,7 +86,8 @@ set(TGT_COMPILE_FLAGS "${SCHAR_FLAG};-ftree-vectorize;-funroll-loops;-fPIC;-fomi
 set(TGT_WARN_FLAGS "-Wall;-Wno-unknown-pragmas;-Wno-reorder;-Wno-unused-variable;-Wreturn-type;-Werror=return-type;${REMOVE_WARNING_FLAGS}")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 ###
 # Sanitizers BEGIN
 ###
@@ -144,7 +145,7 @@ if(CONDA_BUILD)
   endif()
 endif()
 
-set(BOOST_CXX_FLAGS "${WARNING_IGNORE_FLAGS} ${CXXSTDFLAG}")
+set(BOOST_CXX_FLAGS "${WARNING_IGNORE_FLAGS} ${CXXSTDFLAG} -fPIC")
 if(FETCH_BOOST)
   set(BOOST_CXX_FLAGS "${BOOST_CXX_FLAGS} -I${CMAKE_CURRENT_SOURCE_DIR}/external/install/include -L${CMAKE_CURRENT_SOURCE_DIR}/external/install/lib")
 endif()
@@ -348,9 +349,9 @@ if(NOT ZLIB_FOUND)
 endif()
 
 if("${CMAKE_INCLUDE_PATH}" STREQUAL "")
-  set(EXTRA_CMAKE_INCLUDE_FLAGS "")
+	set(EXTRA_CMAKE_INCLUDE_FLAGS "-fPIC")
 else()
-  set(EXTRA_CMAKE_INCLUDE_FLAGS "-I${CMAKE_INCLUDE_PATH}")
+	set(EXTRA_CMAKE_INCLUDE_FLAGS "-fPIC -I${CMAKE_INCLUDE_PATH}")
 endif()
 
 if("${CMAKE_LIBRARY_PATH}" STREQUAL "")
@@ -430,11 +431,13 @@ endif()
 ##
 set(Boost_ADDITIONAL_VERSIONS "1.59.0" "1.60.0" "1.61.0" "1.62.0" "1.63.0" "1.64.0" "1.65.0" "1.66.0" "1.67.0" "1.68.0" "1.69.0" "1.70.0" "1.71.0" "1.72.0" "1.73.0" "1.74.0"  "1.75.0" "1.76.0" "1.77.0" "1.78.0")
 if (NOT BOOST_RECONFIGURE)
-find_package(Boost 1.59.0 COMPONENTS iostreams system filesystem timer chrono program_options)
+find_package(Boost 1.59.0 COMPONENTS iostreams system filesystem timer chrono program_options python)
 message("BOOST_INCLUDEDIR = ${BOOST_INCLUDEDIR}")
 message("BOOST_LIBRARYDIR = ${BOOST_LIBRARYDIR}")
 message("Boost_FOUND = ${Boost_FOUND}")
 endif()
+
+find_package(PythonLibs 2.7 REQUIRED)
 
 include(ExternalProject)
 
@@ -459,7 +462,7 @@ if(BOOST_RECONFIGURE)
   set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/install)
   set(Boost_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/install/include)
   set(Boost_LIBRARY_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/install/lib)
-  find_package(Boost 1.59.0 COMPONENTS iostreams system filesystem timer chrono program_options locale REQUIRED)
+  find_package(Boost 1.59.0 COMPONENTS iostreams system filesystem timer chrono program_options locale python REQUIRED)
   set(FETCH_BOOST FALSE)
 endif()
 
@@ -485,7 +488,7 @@ elseif(FETCH_BOOST)
   set(BOOST_LIB_SUBSET --with-iostreams --with-atomic --with-chrono --with-container --with-date_time --with-exception
     --with-filesystem --with-graph --with-graph_parallel --with-math
     --with-program_options --with-system  --with-locale
-    --with-timer)
+    --with-timer --with-python)
   set(BOOST_WILL_RECONFIGURE TRUE)
   set(FETCH_BOOST FALSE)
   set(BOOST_FETCHED_VERSION "1_72_0")
@@ -843,8 +846,10 @@ endif()
 if(CONDA_BUILD)
   set(JEMALLOC_FLAGS "CC=${CMAKE_C_COMPILER} CFLAGS=\\\"-fPIC ${SCHAR_FLAG}\\\" CPPFLAGS=\\\"-fPIC ${SCHAR_FLAG}\\\"")
 else()
-  set(JEMALLOC_FLAGS "CC=${CMAKE_C_COMPILER} CFLAGS=${SCHAR_FLAG} CPPFLAGS=${SCHAR_FLAG}")
+	#set(JEMALLOC_FLAGS "CC=${CMAKE_C_COMPILER} CFLAGS=\\\"-fPIC ${SCHAR_FLAG}\\\" CPPFLAGS=\\\"-fPIC ${SCHAR_FLAG}\\\"")
+  set(JEMALLOC_FLAGS "CC=${CMAKE_C_COMPILER} CFLAGS=-fPIC CPPFLAGS=-fPIC")
 endif()
+message (STATUS "JEMALLOC Flags:${JEMALLOC_FLAGS}")
 
 if(NOT HAVE_FAST_MALLOC)
   message("Build system will fetch and use JEMalloc")

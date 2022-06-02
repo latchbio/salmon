@@ -191,7 +191,12 @@ if(HAS_IPO AND (NOT NO_IPO))
 endif()
 
 # Build the salmon executable
-add_executable(salmon ${SALMON_MAIN_SRCS} ${SALMON_ALIGN_SRCS})
+
+
+add_library(salmon MODULE ${SALMON_MAIN_SRCS} ${SALMON_ALIGN_SRCS})
+
+target_link_libraries(salmon ${Boost_LIBRARIES} ${PYTHON_LIBRARIES})
+target_include_directories(salmon PRIVATE ${PYTHON_INCLUDE_DIRS})
 
 if(HAS_IPO AND (NOT NO_IPO))
   set_property(TARGET salmon PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
@@ -457,3 +462,14 @@ add_test( NAME salmon_read_test_quasi COMMAND ${CMAKE_COMMAND} -DTOPLEVEL_DIR=${
 
 # Remove this test since we are removing support for the FMD index. 
 # add_test( NAME salmon_read_test_fmd COMMAND ${CMAKE_COMMAND} -DTOPLEVEL_DIR=${GAT_SOURCE_DIR} -P ${GAT_SOURCE_DIR}/cmake/TestSalmonFMD.cmake )
+
+# Without this, any build libraries automatically have names "lib{x}.so"
+set(CMAKE_SHARED_MODULE_PREFIX "")
+
+# Add a shared module - modules are intended to be imported at runtime.
+# - This is where you add the source files
+#add_library(strandedness MODULE SalmonQuantify.cpp)
+
+# Set up the libraries and header search paths for this target
+#target_link_libraries(strandedness ${Boost_LIBRARIES} ${PYTHON_LIBRARIES})
+#target_include_directories(strandedness PRIVATE ${PYTHON_INCLUDE_DIRS})
